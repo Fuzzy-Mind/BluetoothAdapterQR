@@ -5,6 +5,9 @@
  */
 
 #include "BLEDevice.h"
+#include <esp_task_wdt.h>
+
+#define WDT_TIMEOUT 10
 
 #define cny_pin 34
 #define trg_pin 19
@@ -254,10 +257,13 @@ void ext_dac(uint8_t sdaPin, uint8_t sckPin, uint8_t csPin, uint16_t cmdData, in
 }
 
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL); //add current thread to WDT watch
+  
   Serial.begin(115200);
   Serial2.begin(9600);
   Serial2.setTimeout(10);
-  Serial.println("QR BLE Adapter Initializing ...");
+  Serial.println("QR BLE Adapter v1.0.1 Initializing ...");
   BLEDevice::init("");
 
   pinMode(trg_pin, OUTPUT);
@@ -299,26 +305,7 @@ void setup() {
 } // End of setup.
 
 void loop() {
-
-  cnyValue = analogRead(cny_pin);
-  if(cnyValue>50){
-    digitalWrite(trg_pin, LOW);
-    delay(100);
-    digitalWrite(trg_pin, HIGH);
-    deviceMacAddress = "";
-    long int timeout = 1000;
-    long int startTime = millis();
-    while((millis()- startTime)<timeout){
-      if (Serial2.available() > 0) {
-        incomingByte = Serial2.read();
-        deviceMacAddress = deviceMacAddress + incomingByte;
-        if(incomingByte == '\n'){
-          Serial.println(deviceMacAddress);
-          break;
-        }
-      }
-    }
-  }
+  esp_task_wdt_reset();
   
   if (doConnect == true) {
     if (connectToServer()) {
@@ -330,6 +317,25 @@ void loop() {
   }
   
   if (!connected) {
+    cnyValue = analogRead(cny_pin);
+    if(cnyValue>50){
+      digitalWrite(trg_pin, LOW);
+      delay(100);
+      digitalWrite(trg_pin, HIGH);
+      deviceMacAddress = "";
+      long int timeout = 1000;
+      long int startTime = millis();
+      while((millis()- startTime)<timeout){
+        if (Serial2.available() > 0) {
+          incomingByte = Serial2.read();
+          deviceMacAddress = deviceMacAddress + incomingByte;
+          if(incomingByte == '\n'){
+            Serial.println(deviceMacAddress);
+            break;
+          }
+        }
+      }
+    }
     Serial.println("Do Scan !!!");
     BLEDevice::getScan()->start(1);
   }
