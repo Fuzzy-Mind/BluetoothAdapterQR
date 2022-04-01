@@ -1,3 +1,9 @@
+/*
+ * v1.0.1 
+ * Watchdog Timer eklendi.
+ * Qr okuma bağlantı koptuğunda yapılacak.
+ */
+
 #include "BLEDevice.h"
 
 #define cny_pin 34
