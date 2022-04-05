@@ -1,7 +1,7 @@
 /*
- * v1.0.1 
- * Watchdog Timer eklendi.
- * Qr okuma bağlantı koptuğunda yapılacak.
+ * v1.1.0 
+ * Kriptolu QR kodları okumak için
+ * algoritma eklendi.
  */
 
 #include "BLEDevice.h"
@@ -26,7 +26,14 @@
 
 BLEScan* pBLEScan;
 
+String tempMacAddress = "";
 String deviceMacAddress = "";
+int firstBit = 0;
+int secondBit = 0;
+int thirdBit = 0;
+int fourthBit = 0;
+int bitCnt = 0;
+int hexCnt = 0;
 
 static BLEUUID serviceUUID("c050");
 static BLEUUID    charUUID("c05a");
@@ -208,8 +215,9 @@ bool connectToServer() {
         return false;
       }
       Serial.println(" - Found our characteristic");
-      if(pRemoteCharacteristic->canNotify())
+      if(pRemoteCharacteristic->canNotify()){
         pRemoteCharacteristic->registerForNotify(notifyCallback);
+      }
   
       connected = true;
       return true;
@@ -322,21 +330,72 @@ void loop() {
       digitalWrite(trg_pin, LOW);
       delay(100);
       digitalWrite(trg_pin, HIGH);
-      deviceMacAddress = "";
+      tempMacAddress = "";
+      bitCnt = 0;
+      hexCnt = 0;
       long int timeout = 1000;
       long int startTime = millis();
       while((millis()- startTime)<timeout){
         if (Serial2.available() > 0) {
           incomingByte = Serial2.read();
-          deviceMacAddress = deviceMacAddress + incomingByte;
-          if(incomingByte == '\n'){
-            Serial.println(deviceMacAddress);
-            break;
+          if(incomingByte >= 48 && incomingByte <= 57){
+            incomingByte = incomingByte - 48;
           }
+          else if(incomingByte >= 97 && incomingByte <= 102){
+            incomingByte = incomingByte - 87;
+          }
+          else{
+            if(tempMacAddress.length() == 18){
+              deviceMacAddress = tempMacAddress;
+              Serial.print("Addr : ");
+              Serial.println(deviceMacAddress.substring(0,17));
+            }
+            tempMacAddress = "";
+            break;
+          }          
+          //Serial.print("Bit Counter : ");
+          bitCnt = bitCnt%2;
+          //Serial.println(bitCnt);
+          
+          if(bitCnt == 0){
+            firstBit = (incomingByte & 8) >> 3;
+            secondBit = (incomingByte & 2) >> 1;
+          }
+          else if(bitCnt == 1){
+            thirdBit = (incomingByte & 8) >> 3;
+            fourthBit = (incomingByte & 2) >> 1;
+
+            /*Serial.print("First  : ");
+            Serial.println(firstBit);
+            Serial.print("Second : ");
+            Serial.println(secondBit);
+            Serial.print("Third  : ");
+            Serial.println(thirdBit);
+            Serial.print("Fourth : ");
+            Serial.println(fourthBit);*/
+
+            incomingByte = (firstBit<<3) + (secondBit<<2) + (thirdBit<<1) + fourthBit;
+            
+            if(incomingByte >= 0 && incomingByte <= 9){
+              incomingByte = incomingByte + 48;
+            }
+            else if(incomingByte >= 10 && incomingByte <= 15){
+              incomingByte = incomingByte + 87;         
+            }
+
+            tempMacAddress = tempMacAddress + incomingByte;
+            
+            hexCnt = hexCnt%2;
+            if(hexCnt == 1){
+              tempMacAddress = tempMacAddress + ":";
+            }
+            hexCnt++; 
+          }
+          bitCnt++;
         }
       }
     }
-    Serial.println("Do Scan !!!");
+    //Serial.println("Do Scan !!!");
     BLEDevice::getScan()->start(1);
   }
   delay(100);
