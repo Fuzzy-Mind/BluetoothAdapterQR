@@ -3,6 +3,7 @@
  * Kriptolu QR kodları okumak için
  * algoritma eklendi.
  * Serial2 buffer resetlendi.
+ * dacOffset eklendi.
  */
 
 #include "BLEDevice.h"
@@ -58,6 +59,7 @@ static void notifyCallback(
     uint16_t temperature;
     uint16_t dacValue = 0;
     float tempFloat;
+    float dacOffset = 14;
   
     temperature = pData[2];
     temperature = (temperature<<8)+pData[3];
@@ -111,7 +113,7 @@ static void notifyCallback(
     if(1660<=temperature && temperature<=2069)
     {
       //Serial.println("16.6 - 20.6");
-      dacValue = 46*tempFloat+29953.4;
+      dacValue = 46*tempFloat+29953.4 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -120,7 +122,7 @@ static void notifyCallback(
     if(2070<=temperature && temperature<=2479)
     {
       //Serial.println("20.7 - 24.7");
-      dacValue = 45.25*tempFloat+29968.325;
+      dacValue = 45.25*tempFloat+29968.325 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -129,7 +131,7 @@ static void notifyCallback(
     if(2480<=temperature && temperature<=2889)
     {
       //Serial.println("24.8 - 28.8");
-      dacValue = 42.25*tempFloat+30043.2;
+      dacValue = 42.25*tempFloat+30043.2 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -138,7 +140,7 @@ static void notifyCallback(
     if(2890<=temperature && temperature<=3299)
     {
       //Serial.println("28.9 - 32.9");
-      dacValue = 39*tempFloat+30136.9;
+      dacValue = 39*tempFloat+30136.9 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -147,7 +149,7 @@ static void notifyCallback(
     if(3300<=temperature && temperature<=3669)
     {
       //Serial.println("33,0 - 36,6");
-      dacValue = 36.38*tempFloat+30223.46;
+      dacValue = 36.38*tempFloat+30223.46 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -156,7 +158,7 @@ static void notifyCallback(
     if(3670<=temperature)
     {
       //Serial.println("t>36,7");
-      dacValue = 33.63*tempFloat+30223.78;
+      dacValue = 33.63*tempFloat+30223.78 + dacOffset;
       for(int i=0; i<cnt; i++){
       ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
