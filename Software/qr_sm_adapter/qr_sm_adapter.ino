@@ -2,6 +2,7 @@
  * v1.1.0 
  * Kriptolu QR kodları okumak için
  * algoritma eklendi.
+ * Serial2 buffer resetlendi.
  */
 
 #include "BLEDevice.h"
@@ -351,6 +352,7 @@ void loop() {
               Serial.println(deviceMacAddress.substring(0,17));
             }
             tempMacAddress = "";
+            Serial2.flush();
             break;
           }          
           //Serial.print("Bit Counter : ");
