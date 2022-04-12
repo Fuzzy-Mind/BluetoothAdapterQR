@@ -1,4 +1,15 @@
+/*
+ * v1.1.0 
+ * Kriptolu QR kodları okumak için
+ * algoritma eklendi.
+ * Serial2 buffer resetlendi.
+ * dacOffset eklendi.
+ */
+
 #include "BLEDevice.h"
+#include <esp_task_wdt.h>
+
+#define WDT_TIMEOUT 10
 
 #define cny_pin 34
 #define trg_pin 19
@@ -17,7 +28,14 @@
 
 BLEScan* pBLEScan;
 
+String tempMacAddress = "";
 String deviceMacAddress = "";
+int firstBit = 0;
+int secondBit = 0;
+int thirdBit = 0;
+int fourthBit = 0;
+int bitCnt = 0;
+int hexCnt = 0;
 
 static BLEUUID serviceUUID("c050");
 static BLEUUID    charUUID("c05a");
@@ -41,6 +59,7 @@ static void notifyCallback(
     uint16_t temperature;
     uint16_t dacValue = 0;
     float tempFloat;
+    float dacOffset = 14;
   
     temperature = pData[2];
     temperature = (temperature<<8)+pData[3];
@@ -94,7 +113,7 @@ static void notifyCallback(
     if(1660<=temperature && temperature<=2069)
     {
       //Serial.println("16.6 - 20.6");
-      dacValue = 46*tempFloat+29953.4;
+      dacValue = 46*tempFloat+29953.4 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -103,7 +122,7 @@ static void notifyCallback(
     if(2070<=temperature && temperature<=2479)
     {
       //Serial.println("20.7 - 24.7");
-      dacValue = 45.25*tempFloat+29968.325;
+      dacValue = 45.25*tempFloat+29968.325 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -112,7 +131,7 @@ static void notifyCallback(
     if(2480<=temperature && temperature<=2889)
     {
       //Serial.println("24.8 - 28.8");
-      dacValue = 42.25*tempFloat+30043.2;
+      dacValue = 42.25*tempFloat+30043.2 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -121,7 +140,7 @@ static void notifyCallback(
     if(2890<=temperature && temperature<=3299)
     {
       //Serial.println("28.9 - 32.9");
-      dacValue = 39*tempFloat+30136.9;
+      dacValue = 39*tempFloat+30136.9 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -130,7 +149,7 @@ static void notifyCallback(
     if(3300<=temperature && temperature<=3669)
     {
       //Serial.println("33,0 - 36,6");
-      dacValue = 36.38*tempFloat+30223.46;
+      dacValue = 36.38*tempFloat+30223.46 + dacOffset;
       for(int i=0; i<cnt; i++){
         ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -139,7 +158,7 @@ static void notifyCallback(
     if(3670<=temperature)
     {
       //Serial.println("t>36,7");
-      dacValue = 33.63*tempFloat+30223.78;
+      dacValue = 33.63*tempFloat+30223.78 + dacOffset;
       for(int i=0; i<cnt; i++){
       ext_dac(sda_pin, sck_pin, cs_pin, dacValue, 500);
       }
@@ -199,8 +218,9 @@ bool connectToServer() {
         return false;
       }
       Serial.println(" - Found our characteristic");
-      if(pRemoteCharacteristic->canNotify())
+      if(pRemoteCharacteristic->canNotify()){
         pRemoteCharacteristic->registerForNotify(notifyCallback);
+      }
   
       connected = true;
       return true;
@@ -248,10 +268,13 @@ void ext_dac(uint8_t sdaPin, uint8_t sckPin, uint8_t csPin, uint16_t cmdData, in
 }
 
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL); //add current thread to WDT watch
+  
   Serial.begin(115200);
   Serial2.begin(9600);
   Serial2.setTimeout(10);
-  Serial.println("QR BLE Adapter Initializing ...");
+  Serial.println("QR BLE Adapter v1.0.1 Initializing ...");
   BLEDevice::init("");
 
   pinMode(trg_pin, OUTPUT);
@@ -293,26 +316,7 @@ void setup() {
 } // End of setup.
 
 void loop() {
-
-  cnyValue = analogRead(cny_pin);
-  if(cnyValue>50){
-    digitalWrite(trg_pin, LOW);
-    delay(100);
-    digitalWrite(trg_pin, HIGH);
-    deviceMacAddress = "";
-    long int timeout = 1000;
-    long int startTime = millis();
-    while((millis()- startTime)<timeout){
-      if (Serial2.available() > 0) {
-        incomingByte = Serial2.read();
-        deviceMacAddress = deviceMacAddress + incomingByte;
-        if(incomingByte == '\n'){
-          Serial.println(deviceMacAddress);
-          break;
-        }
-      }
-    }
-  }
+  esp_task_wdt_reset();
   
   if (doConnect == true) {
     if (connectToServer()) {
@@ -324,7 +328,78 @@ void loop() {
   }
   
   if (!connected) {
-    Serial.println("Do Scan !!!");
+    cnyValue = analogRead(cny_pin);
+    if(cnyValue>50){
+      digitalWrite(trg_pin, LOW);
+      delay(100);
+      digitalWrite(trg_pin, HIGH);
+      tempMacAddress = "";
+      bitCnt = 0;
+      hexCnt = 0;
+      long int timeout = 1000;
+      long int startTime = millis();
+      while((millis()- startTime)<timeout){
+        if (Serial2.available() > 0) {
+          incomingByte = Serial2.read();
+          if(incomingByte >= 48 && incomingByte <= 57){
+            incomingByte = incomingByte - 48;
+          }
+          else if(incomingByte >= 97 && incomingByte <= 102){
+            incomingByte = incomingByte - 87;
+          }
+          else{
+            if(tempMacAddress.length() == 18){
+              deviceMacAddress = tempMacAddress;
+              Serial.print("Addr : ");
+              Serial.println(deviceMacAddress.substring(0,17));
+            }
+            tempMacAddress = "";
+            Serial2.flush();
+            break;
+          }          
+          //Serial.print("Bit Counter : ");
+          bitCnt = bitCnt%2;
+          //Serial.println(bitCnt);
+          
+          if(bitCnt == 0){
+            firstBit = (incomingByte & 8) >> 3;
+            secondBit = (incomingByte & 2) >> 1;
+          }
+          else if(bitCnt == 1){
+            thirdBit = (incomingByte & 8) >> 3;
+            fourthBit = (incomingByte & 2) >> 1;
+
+            /*Serial.print("First  : ");
+            Serial.println(firstBit);
+            Serial.print("Second : ");
+            Serial.println(secondBit);
+            Serial.print("Third  : ");
+            Serial.println(thirdBit);
+            Serial.print("Fourth : ");
+            Serial.println(fourthBit);*/
+
+            incomingByte = (firstBit<<3) + (secondBit<<2) + (thirdBit<<1) + fourthBit;
+            
+            if(incomingByte >= 0 && incomingByte <= 9){
+              incomingByte = incomingByte + 48;
+            }
+            else if(incomingByte >= 10 && incomingByte <= 15){
+              incomingByte = incomingByte + 87;         
+            }
+
+            tempMacAddress = tempMacAddress + incomingByte;
+            
+            hexCnt = hexCnt%2;
+            if(hexCnt == 1){
+              tempMacAddress = tempMacAddress + ":";
+            }
+            hexCnt++; 
+          }
+          bitCnt++;
+        }
+      }
+    }
+    //Serial.println("Do Scan !!!");
     BLEDevice::getScan()->start(1);
   }
   delay(100);
